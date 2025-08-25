@@ -1,0 +1,75 @@
+server:
+  port: 8080
+  shutdown: graceful
+
+spring:
+  application:
+    name: aviation-api-wrapper
+
+  cache:
+    type: simple
+    cache-names: airports
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=15m
+
+# Aviation API Configuration
+aviation:
+  api:
+    base-url: https://api.aviationapi.com
+
+# Resilience4j Configuration
+resilience4j:
+  circuitbreaker:
+    instances:
+      aviation-api:
+        register-health-indicator: true
+        sliding-window-size: 10
+        permitted-number-of-calls-in-half-open-state: 3
+        sliding-window-type: count_based
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        automatic-transition-from-open-to-half-open-enabled: true
+
+  retry:
+    instances:
+      aviation-api:
+        max-attempts: 3
+        wait-duration: 1s
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - java.net.SocketTimeoutException
+          - java.io.IOException
+
+  ratelimiter:
+    instances:
+      aviation-api:
+        limit-for-period: 100
+        limit-refresh-period: 60s
+        timeout-duration: 5s
+
+# Actuator Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,circuitbreakers
+  endpoint:
+    health:
+      show-details: when_authorized
+  health:
+    circuitbreakers:
+      enabled: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+# Logging Configuration
+logging:
+  level:
+    com.aviationservice: INFO
+    org.springframework.web.reactive.function.client: DEBUG
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
